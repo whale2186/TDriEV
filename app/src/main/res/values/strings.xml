@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_battery_name">TDriEV Battery &amp; Range</string>
+    <string name="widget_battery_desc">Glanceable EV state of charge and estimated range.</string>
+    <string name="widget_control_name">TDriEV Lock &amp; Unlock</string>
+    <string name="widget_control_desc">One-tap remote lock and unlock controls.</string>
+    <string name="widget_status_name">TDriEV Status &amp; Odometer</string>
+    <string name="widget_status_desc">Odometer, ignition, doors and parked location navigation.</string>
+</resources>

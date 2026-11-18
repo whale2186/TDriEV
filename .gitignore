@@ -1,0 +1,10 @@
+.gradle/
+.gradle-user-home/
+.emulator/
+**/build/
+local.properties
+*.keystore
+*.jks
+.idea/
+artifacts/
+evidence/
