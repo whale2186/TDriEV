@@ -1,6 +1,6 @@
 # Release v0.2.6 — TDriEV
 
-Initial standalone release of **TDriEV**, a lightweight native Android companion application for Tata electric vehicles (Tiago.ev, Nexon.ev, Punch.ev, Tigor.ev, and Curvv.ev) — reverse-engineered from [Tata.ev](https://play.google.com/store/apps/details?id=com.tatamotors.evoneapp).
+Initial standalone release of **TDriEV**, a lightweight native Android companion application for Tata electric vehicles — reverse-engineered from [Tata.ev](https://play.google.com/store/apps/details?id=com.tatamotors.evoneapp).
 
 ## What's New
 

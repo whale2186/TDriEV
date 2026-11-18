@@ -1,6 +1,6 @@
 # TDriEV
 
-A lightweight, private native Android companion app for Tata electric vehicles (Tiago.ev, Nexon.ev, Punch.ev, Tigor.ev, and Curvv.ev) — reverse-engineered from [Tata.ev](https://play.google.com/store/apps/details?id=com.tatamotors.evoneapp).
+A lightweight, private native Android companion app for Tata electric vehicles — reverse-engineered from [Tata.ev](https://play.google.com/store/apps/details?id=com.tatamotors.evoneapp).
 
 Built with Kotlin and Jetpack Compose. Fast, AMOLED-black, and connects directly to the vehicle API with no third-party tracking, analytics, or middleman servers.
 
