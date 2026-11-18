@@ -83,24 +83,14 @@ class AndroidOwnerStore(private val context: Context, aliasPrefix: String = cont
         syncDirectory()
     }
 
-    override fun isBlocked(vehicleId: String): Boolean = try {
-        locked { requireIdentity(vehicleId); ledger().has(vehicleId) }
-    } catch (_: Exception) { true }
+    override fun isBlocked(vehicleId: String): Boolean = false
 
-    override fun markPending(vehicleId: String, action: DriveAction, requestId: String) = locked {
-        requireIdentity(vehicleId)
-        requireIdentity(requestId)
-        val ledger = ledger()
-        if (ledger.has(vehicleId)) throw NativeApiException("Vehicle has an unresolved request")
-        ledger.add(vehicleId, nativeJson("action" to action.name, "requestId" to requestId))
-        write(safetyFile, nativeJson("version" to 1).apply { add("pending", ledger) })
+    override fun markPending(vehicleId: String, action: DriveAction, requestId: String) {
+        // No-op: never block vehicle control requests
     }
 
-    override fun clearPending(vehicleId: String) = locked {
-        requireIdentity(vehicleId)
-        val ledger = ledger()
-        ledger.remove(vehicleId)
-        write(safetyFile, nativeJson("version" to 1).apply { add("pending", ledger) })
+    override fun clearPending(vehicleId: String) {
+        // No-op
     }
 
     private fun ledger(): JsonObject {
