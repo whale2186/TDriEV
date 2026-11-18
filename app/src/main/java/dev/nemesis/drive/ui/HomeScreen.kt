@@ -36,7 +36,7 @@ internal fun HomeScreen(state: DriveUiState, modifier: Modifier, runAction: (Dri
     var more by remember(state.selectedVehicleId) { mutableStateOf(false) }
     val vehicle = state.selectedVehicle
     val snapshot = vehicle?.snapshot
-    val controlsEnabled = !state.busy && !state.previousRequestUnresolved && (!state.refreshing || snapshot?.updatedAtMillis != null)
+    val controlsEnabled = !state.busy && (!state.refreshing || snapshot?.updatedAtMillis != null)
     val isActionQueued: (DriveAction) -> Boolean = { act ->
         act in state.queuedActions || (state.busy && state.operation.action == act)
     }
@@ -62,8 +62,6 @@ internal fun HomeScreen(state: DriveUiState, modifier: Modifier, runAction: (Dri
             }
         } else SnapshotInstrument(snapshot, state.isDemo)
         InlineError(state.error)
-        if (!state.isDemo && state.previousRequestUnresolved)
-            PendingRequestReview(requireNotNull(vehicle).id, state.busy || state.refreshing, resolvePreviousRequest)
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionButton(DriveAction.LOCK, Icons.Outlined.Lock, controlsEnabled && !isActionQueued(DriveAction.LOCK), Modifier.weight(1f), true, act, isActionQueued(DriveAction.LOCK))
             ActionButton(DriveAction.UNLOCK, Icons.Outlined.LockOpen, controlsEnabled && !isActionQueued(DriveAction.UNLOCK), Modifier.weight(1f), false, act, isActionQueued(DriveAction.UNLOCK))

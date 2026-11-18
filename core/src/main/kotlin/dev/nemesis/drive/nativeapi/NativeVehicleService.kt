@@ -267,7 +267,8 @@ class NativeVehicleService(
             var result = commandResult(transport.execute(physical), vehicle, isV2)
             val initialStatus = result.text("status")?.lowercase(java.util.Locale.ROOT)
             val isIdempotent = action != DriveAction.HORN
-            val isAccepted = initialStatus in setOf("accepted", "success", "in progress", "pending", "executing", "waking_up")
+            val isAccepted = initialStatus in setOf("accepted", "success", "in progress", "pending", "executing", "waking_up", "queued", "submitted", "ok") ||
+                (result.has("commandId") || result.has("correlationId"))
             if (fireAndForget && isIdempotent && isAccepted) {
                 ledger.clearPending(vehicle.vehicle.id)
                 return report(OperationPhase.SUCCESS, "Command sent to vehicle")

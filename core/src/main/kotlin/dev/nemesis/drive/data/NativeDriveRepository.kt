@@ -200,7 +200,7 @@ class NativeDriveRepository(
     override fun selectVehicle(id: String) {
         if (state.value.step !in setOf(EntryStep.GARAGE, EntryStep.DASHBOARD) || id !in owned) { error("Select a vehicle returned by your authenticated owner account."); return }
         cancelPendingAction(); readJob?.cancel()
-        val unresolved = runCatching { ledger.isBlocked(id) }.getOrDefault(true)
+        val unresolved = runCatching { ledger.isBlocked(id) }.getOrDefault(false)
         change { it.copy(selectedVehicleId = id, step = EntryStep.DASHBOARD, operation = OperationState(), refreshing = false,
             error = null, authNotice = null, previousRequestUnresolved = unresolved) }
         refreshTelemetry()
