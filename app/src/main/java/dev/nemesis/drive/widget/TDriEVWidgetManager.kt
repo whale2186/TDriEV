@@ -96,10 +96,18 @@ object TDriEVWidgetManager {
         val unlockPending = PendingIntent.getBroadcast(context, 102, unlockIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         views.setOnClickPendingIntent(R.id.widget_btn_unlock, unlockPending)
 
+        views.setTextViewText(R.id.widget_text_lock, "Lock")
+        views.setTextViewText(R.id.widget_text_unlock, "Unlock")
+
         if (snapshot != null) {
-            val lockText = if (snapshot.locked == true) "Locked" else if (snapshot.locked == false) "Unlocked" else "Ready"
+            val isLocked = snapshot.locked == true
+            val lockText = if (isLocked) "Locked" else if (snapshot.locked == false) "Unlocked" else "Ready"
             val soc = snapshot.batteryPercent ?: "—"
             views.setTextViewText(R.id.widget_status_pill, "$soc% · $lockText")
+            views.setInt(R.id.widget_btn_lock, "setBackgroundResource",
+                if (isLocked) R.drawable.widget_btn_primary else R.drawable.widget_btn_tonal)
+            views.setInt(R.id.widget_btn_unlock, "setBackgroundResource",
+                if (!isLocked) R.drawable.widget_btn_primary else R.drawable.widget_btn_tonal)
         } else {
             views.setTextViewText(R.id.widget_status_pill, "TDriEV Ready")
         }

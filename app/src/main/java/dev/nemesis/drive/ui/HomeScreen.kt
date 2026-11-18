@@ -1,8 +1,10 @@
 package dev.nemesis.drive.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -11,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -99,7 +102,7 @@ internal fun HomeScreen(state: DriveUiState, modifier: Modifier, runAction: (Dri
             CompactAction(DriveAction.HORN, Icons.Outlined.VolumeUp, controlsEnabled && !isActionQueued(DriveAction.HORN), Modifier.weight(1f), act, isActionQueued(DriveAction.HORN))
             val approachActive = snapshot.approachOn == true
             val approachAction = if (approachActive) DriveAction.APPROACH_OFF else DriveAction.APPROACH_ON
-            CompactAction(approachAction, Icons.Outlined.Lightbulb, controlsEnabled && !isActionQueued(approachAction), Modifier.weight(1f), act, isActionQueued(approachAction))
+            CompactAction(approachAction, Icons.Outlined.Lightbulb, controlsEnabled && !isActionQueued(approachAction), Modifier.weight(1f), act, isActionQueued(approachAction), isActive = approachActive)
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                 FilledTonalIconButton(onClick = { more = true }, modifier = Modifier.size(48.dp).testTag("more_controls")) {
                     Icon(Icons.Outlined.MoreHoriz, "More vehicle controls")
@@ -195,26 +198,109 @@ internal fun HomeScreen(state: DriveUiState, modifier: Modifier, runAction: (Dri
                 Text("Lights & visibility", style = MaterialTheme.typography.headlineMedium)
                 Text((if (state.isDemo) "Demo controls for " else "Commands act on ") + (vehicle?.nickname ?: "this vehicle"),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Hazard lights · ${booleanLabel(snapshot?.hazardOn, "On", "Off")}", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionButton(DriveAction.HAZARD_ON, Icons.Outlined.WarningAmber, controlsEnabled, Modifier.weight(1f), true, act)
-                    ActionButton(DriveAction.HAZARD_OFF, Icons.Outlined.WarningAmber, controlsEnabled, Modifier.weight(1f), false, act)
+                val hazardActive = snapshot?.hazardOn == true
+                val hazardAction = if (hazardActive) DriveAction.HAZARD_OFF else DriveAction.HAZARD_ON
+                val hazardQueued = isActionQueued(DriveAction.HAZARD_ON) || isActionQueued(DriveAction.HAZARD_OFF)
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (hazardActive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = controlsEnabled && !hazardQueued) { act(hazardAction) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(if (hazardActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (hazardQueued) {
+                                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onError)
+                            } else {
+                                Icon(
+                                    Icons.Outlined.WarningAmber,
+                                    null,
+                                    tint = if (hazardActive) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Hazard lights", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (hazardQueued) "Sending command…" else if (hazardActive) "Active · Tap to turn off" else "Off · Tap to turn on",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = hazardActive,
+                            onCheckedChange = { act(hazardAction) },
+                            enabled = controlsEnabled && !hazardQueued
+                        )
+                    }
                 }
-                Text("Position lamps · ${booleanLabel(snapshot?.positionOn, "On", "Off")}", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ActionButton(DriveAction.POSITION_ON, Icons.Outlined.Lightbulb, controlsEnabled, Modifier.weight(1f), true, act)
-                    ActionButton(DriveAction.POSITION_OFF, Icons.Outlined.Lightbulb, controlsEnabled, Modifier.weight(1f), false, act)
+
+                val positionActive = snapshot?.positionOn == true
+                val positionAction = if (positionActive) DriveAction.POSITION_OFF else DriveAction.POSITION_ON
+                val positionQueued = isActionQueued(DriveAction.POSITION_ON) || isActionQueued(DriveAction.POSITION_OFF)
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (positionActive) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = controlsEnabled && !positionQueued) { act(positionAction) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(if (positionActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (positionQueued) {
+                                CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            } else {
+                                Icon(
+                                    Icons.Outlined.Lightbulb,
+                                    null,
+                                    tint = if (positionActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Position lamps", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (positionQueued) "Sending command…" else if (positionActive) "Active · Tap to turn off" else "Off · Tap to turn on",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = positionActive,
+                            onCheckedChange = { act(positionAction) },
+                            enabled = controlsEnabled && !positionQueued
+                        )
+                    }
                 }
+
                 if (state.isDemo) {
                     Text("Demo mode · not connected to your car", style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary)
                 }
-                // The underlying inline result is obscured by the sheet, so expose its state here too.
-                if (state.operation.phase != OperationPhase.IDLE) {
-                    Text(operationTitle(state.operation.phase, state.isDemo),
-                        style = MaterialTheme.typography.titleMedium)
-                    Text(if (!state.isDemo && state.operation.phase == OperationPhase.SUCCESS) "Reported by vehicle service" else state.operation.message, style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (state.operation.phase == OperationPhase.FAILED) {
+                    Text(state.operation.message, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error)
                 }
             }
         }
@@ -331,17 +417,39 @@ private fun ActionButton(action: DriveAction, icon: ImageVector, enabled: Boolea
 }
 
 @Composable
-private fun CompactAction(action: DriveAction, icon: ImageVector, enabled: Boolean, modifier: Modifier, onAction: (DriveAction) -> Unit, isQueued: Boolean = false) {
+private fun CompactAction(
+    action: DriveAction,
+    icon: ImageVector,
+    enabled: Boolean,
+    modifier: Modifier,
+    onAction: (DriveAction) -> Unit,
+    isQueued: Boolean = false,
+    isActive: Boolean = false
+) {
+    val containerColor = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        FilledTonalIconButton(onClick = { onAction(action) }, enabled = enabled,
-            modifier = Modifier.size(48.dp).testTag("action_${action.name.lowercase()}")) {
+        IconButton(
+            onClick = { onAction(action) },
+            enabled = enabled,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(containerColor)
+                .testTag("action_${action.name.lowercase()}")
+        ) {
             if (isQueued) {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = contentColor)
             } else {
-                Icon(icon, action.title, Modifier.size(22.dp))
+                Icon(icon, action.title, Modifier.size(22.dp), tint = contentColor)
             }
         }
-        Text(if (isQueued) "Queued" else action.title, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 5.dp))
+        Text(
+            if (isQueued) "Queued" else action.title,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(top = 5.dp)
+        )
     }
 }
 

@@ -252,11 +252,27 @@ class NativeDriveRepository(
     override fun runAction(action: DriveAction) {
         val current = state.value
         if (current.step != EntryStep.DASHBOARD || current.authBusy) return
+        val currentSnapshot = current.selectedVehicle?.snapshot
+        val optimisticSnapshot = when (action) {
+            DriveAction.APPROACH_ON -> currentSnapshot?.copy(approachOn = true)
+            DriveAction.APPROACH_OFF -> currentSnapshot?.copy(approachOn = false)
+            DriveAction.HAZARD_ON -> currentSnapshot?.copy(hazardOn = true)
+            DriveAction.HAZARD_OFF -> currentSnapshot?.copy(hazardOn = false)
+            DriveAction.POSITION_ON -> currentSnapshot?.copy(positionOn = true)
+            DriveAction.POSITION_OFF -> currentSnapshot?.copy(positionOn = false)
+            else -> currentSnapshot
+        }
+        val optimisticVehicles = if (optimisticSnapshot != null && current.selectedVehicleId != null) {
+            current.vehicles.map {
+                if (it.id == current.selectedVehicleId) it.copy(snapshot = optimisticSnapshot) else it
+            }
+        } else current.vehicles
+
         synchronized(commandQueue) {
             if (action in commandQueue || (current.busy && current.operation.action == action)) return
             commandQueue.addLast(action)
         }
-        change { it.copy(queuedActions = it.queuedActions + action) }
+        change { it.copy(queuedActions = it.queuedActions + action, vehicles = optimisticVehicles) }
         if (queueProcessorJob?.isActive != true) {
             queueProcessorJob = scope.launch {
                 while (true) {
@@ -264,10 +280,6 @@ class NativeDriveRepository(
                         if (commandQueue.isNotEmpty()) commandQueue.removeFirst() else null
                     } ?: break
 
-                    val elapsed = now() - lastCommandSentAt
-                    if (lastCommandSentAt > 0L && elapsed < 5_000L) {
-                        delay(5_000L - elapsed)
-                    }
                     lastCommandSentAt = now()
                     executeSingleAction(next)
                     actionJob?.join()

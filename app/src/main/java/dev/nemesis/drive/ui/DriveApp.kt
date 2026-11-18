@@ -366,6 +366,7 @@ internal fun GarageScreen(state: DriveUiState, modifier: Modifier, select: (Stri
 @Composable
 private fun OperationStrip(state: DriveUiState, cancel: () -> Unit) {
     val operation = state.operation
+    if (operation.phase == OperationPhase.SUCCESS) return
     val failed = operation.phase == OperationPhase.FAILED || operation.phase == OperationPhase.UNKNOWN
     val title = operationTitle(operation.phase, state.isDemo)
 

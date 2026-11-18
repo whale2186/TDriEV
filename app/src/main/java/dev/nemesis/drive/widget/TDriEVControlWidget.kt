@@ -55,8 +55,19 @@ class TDriEVControlWidget : AppWidgetProvider() {
         }
 
         widgetScope.launch {
+            val store = AndroidOwnerStore(context.applicationContext)
             try {
-                val store = AndroidOwnerStore(context.applicationContext)
+                // 1. Immediately apply optimistic state to local snapshot
+                val currentSnapshot = TDriEVWidgetManager.loadLatestSnapshot(context)
+                if (currentSnapshot != null) {
+                    val optimistic = currentSnapshot.copy(
+                        locked = (action == DriveAction.LOCK),
+                        updatedAtMillis = System.currentTimeMillis()
+                    )
+                    store.saveSnapshot("latest", com.google.gson.Gson().toJson(optimistic))
+                }
+
+                // 2. Transmit command
                 val session = store.load() ?: return@launch
                 val transport = OwnerHttpsTransport()
                 val auth = NativeAuthService(transport, store)
@@ -65,11 +76,16 @@ class TDriEVControlWidget : AppWidgetProvider() {
                 val vehicle = vehicles.firstOrNull() ?: return@launch
 
                 service.run(session, vehicle, action, 10, UUID.randomUUID().toString(), {}) { _, _ -> }
-                delay(2500)
-                val snapshot = service.snapshot(session, vehicle)
-                val json = com.google.gson.Gson().toJson(snapshot)
-                store.saveSnapshot(vehicle.vehicle.id, json)
+
+                // 3. Save confirmed snapshot
+                val confirmed = (currentSnapshot ?: vehicle.vehicle.snapshot).copy(
+                    locked = (action == DriveAction.LOCK),
+                    updatedAtMillis = System.currentTimeMillis()
+                )
+                store.saveSnapshot(vehicle.vehicle.id, com.google.gson.Gson().toJson(confirmed))
             } catch (_: Exception) {
+                // Handled in finally
+            } finally {
                 TDriEVWidgetManager.updateAllWidgets(context)
             }
         }
