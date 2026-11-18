@@ -58,6 +58,10 @@ class DriveViewModel(application: Application) : AndroidViewModel(application) {
     fun resolvePreviousRequest(vehicleId: String, acknowledged: Boolean) = repository.resolvePreviousRequest(vehicleId, acknowledged)
     fun back() = repository.back()
     fun unlockApp() = repository.unlockApp()
+    fun resetSecurityAndSignOut() {
+        securityManager.clearSecurity()
+        repository.signOut()
+    }
     fun lockApp() = repository.lockApp()
     fun setAppLockEnabled(enabled: Boolean) = repository.setAppLockEnabled(enabled)
     fun setBiometricsEnabled(enabled: Boolean) = repository.setBiometricsEnabled(enabled)

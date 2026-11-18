@@ -51,7 +51,8 @@ fun DriveApp(
                 state = state,
                 onUnlockWithPin = { pin -> viewModel.verifyPin(pin) },
                 onTriggerBiometric = onTriggerBiometric,
-                onMinimize = onMinimize
+                onMinimize = onMinimize,
+                onSignOut = { viewModel.resetSecurityAndSignOut() }
             )
         } else {
             BackHandler(enabled = state.step != EntryStep.WELCOME) { viewModel.back() }

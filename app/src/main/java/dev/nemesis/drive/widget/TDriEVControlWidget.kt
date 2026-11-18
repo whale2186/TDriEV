@@ -54,6 +54,7 @@ class TDriEVControlWidget : AppWidgetProvider() {
             }
         }
 
+        val pendingResult = goAsync()
         widgetScope.launch {
             val store = AndroidOwnerStore(context.applicationContext)
             try {
@@ -68,9 +69,10 @@ class TDriEVControlWidget : AppWidgetProvider() {
                 }
 
                 // 2. Transmit command
-                val session = store.load() ?: return@launch
+                var session = store.load() ?: return@launch
                 val transport = OwnerHttpsTransport()
                 val auth = NativeAuthService(transport, store)
+                session = runCatching { auth.refresh(session) }.getOrDefault(session)
                 val service = NativeVehicleService(transport, auth, store, fireAndForget = true)
                 val vehicles = service.vehicles(session)
                 val vehicle = vehicles.firstOrNull() ?: return@launch
@@ -87,6 +89,7 @@ class TDriEVControlWidget : AppWidgetProvider() {
                 // Handled in finally
             } finally {
                 TDriEVWidgetManager.updateAllWidgets(context)
+                try { pendingResult.finish() } catch (_: Exception) {}
             }
         }
     }

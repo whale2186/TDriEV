@@ -233,11 +233,22 @@ class NativeDriveRepository(
                 val snapshot = service.snapshot(active, vehicle)
                 currentCoroutineContext().ensureActive()
                 if (generation == epoch && state.value.selectedVehicleId == vehicle.vehicle.id && session === active) {
-                    val json = com.google.gson.Gson().toJson(snapshot)
+                    val serverTimestamp = snapshot.updatedAtMillis ?: 0L
+                    val currentSnap = state.value.vehicles.firstOrNull { it.id == vehicle.vehicle.id }?.snapshot
+                    val isStale = serverTimestamp < lastCommandSentAt && (now() - lastCommandSentAt < 60_000L)
+                    val resolvedSnapshot = if (isStale && currentSnap != null) {
+                        snapshot.copy(
+                            approachOn = currentSnap.approachOn,
+                            hazardOn = currentSnap.hazardOn,
+                            positionOn = currentSnap.positionOn
+                        )
+                    } else snapshot
+
+                    val json = com.google.gson.Gson().toJson(resolvedSnapshot)
                     store?.saveSnapshot(vehicle.vehicle.id, json)
-                    val updatedOwnedVehicle = vehicle.copy(vehicle = vehicle.vehicle.copy(snapshot = snapshot))
+                    val updatedOwnedVehicle = vehicle.copy(vehicle = vehicle.vehicle.copy(snapshot = resolvedSnapshot))
                     owned = owned + (vehicle.vehicle.id to updatedOwnedVehicle)
-                    change { it.copy(vehicles = it.vehicles.map { old -> if (old.id == vehicle.vehicle.id) old.copy(snapshot = snapshot) else old }) }
+                    change { it.copy(vehicles = it.vehicles.map { old -> if (old.id == vehicle.vehicle.id) old.copy(snapshot = resolvedSnapshot) else old }) }
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { if (generation == epoch && state.value.selectedVehicleId == vehicle.vehicle.id && !silent) error(safeFailure(failure)) }
@@ -252,27 +263,12 @@ class NativeDriveRepository(
     override fun runAction(action: DriveAction) {
         val current = state.value
         if (current.step != EntryStep.DASHBOARD || current.authBusy) return
-        val currentSnapshot = current.selectedVehicle?.snapshot
-        val optimisticSnapshot = when (action) {
-            DriveAction.APPROACH_ON -> currentSnapshot?.copy(approachOn = true)
-            DriveAction.APPROACH_OFF -> currentSnapshot?.copy(approachOn = false)
-            DriveAction.HAZARD_ON -> currentSnapshot?.copy(hazardOn = true)
-            DriveAction.HAZARD_OFF -> currentSnapshot?.copy(hazardOn = false)
-            DriveAction.POSITION_ON -> currentSnapshot?.copy(positionOn = true)
-            DriveAction.POSITION_OFF -> currentSnapshot?.copy(positionOn = false)
-            else -> currentSnapshot
-        }
-        val optimisticVehicles = if (optimisticSnapshot != null && current.selectedVehicleId != null) {
-            current.vehicles.map {
-                if (it.id == current.selectedVehicleId) it.copy(snapshot = optimisticSnapshot) else it
-            }
-        } else current.vehicles
 
         synchronized(commandQueue) {
             if (action in commandQueue || (current.busy && current.operation.action == action)) return
             commandQueue.addLast(action)
         }
-        change { it.copy(queuedActions = it.queuedActions + action, vehicles = optimisticVehicles) }
+        change { it.copy(queuedActions = it.queuedActions + action) }
         if (queueProcessorJob?.isActive != true) {
             queueProcessorJob = scope.launch {
                 while (true) {
@@ -308,20 +304,7 @@ class NativeDriveRepository(
         val generation = epoch
         val intentCreatedAt = now()
         steps = listOf("Contacting the selected owned vehicle")
-        val currentSnapshot = state.value.selectedVehicle?.snapshot ?: vehicle.vehicle.snapshot
-        val optimisticSnapshot = when (action) {
-            DriveAction.APPROACH_ON -> currentSnapshot.copy(approachOn = true)
-            DriveAction.APPROACH_OFF -> currentSnapshot.copy(approachOn = false)
-            DriveAction.HAZARD_ON -> currentSnapshot.copy(hazardOn = true)
-            DriveAction.HAZARD_OFF -> currentSnapshot.copy(hazardOn = false)
-            DriveAction.POSITION_ON -> currentSnapshot.copy(positionOn = true)
-            DriveAction.POSITION_OFF -> currentSnapshot.copy(positionOn = false)
-            else -> currentSnapshot
-        }
-        val optimisticVehicles = state.value.vehicles.map {
-            if (it.id == vehicle.vehicle.id) it.copy(snapshot = optimisticSnapshot) else it
-        }
-        change { it.copy(error = null, vehicles = optimisticVehicles, operation = OperationState(action, OperationPhase.CONTACTING, steps.last(), vehicle.vehicle.id, requestId)) }
+        change { it.copy(error = null, operation = OperationState(action, OperationPhase.CONTACTING, steps.last(), vehicle.vehicle.id, requestId)) }
         actionJob = scope.launch {
             val guard: suspend () -> Unit = {
                 currentCoroutineContext().ensureActive()
@@ -364,9 +347,33 @@ class NativeDriveRepository(
         val action = operation.action ?: return
         steps = steps + message
         val entry = ActivityEntry(operation.requestId ?: return, vehicle.vehicle.id, vehicle.vehicle.model, action, now(), message, steps)
-        val unresolved = runCatching { ledger.isBlocked(vehicle.vehicle.id) }.getOrDefault(true)
-        change { it.copy(operation = operation.copy(phase = phase, message = message),
-            history = (listOf(entry) + it.history).take(100), previousRequestUnresolved = unresolved) }
+        val unresolved = runCatching { ledger.isBlocked(vehicle.vehicle.id) }.getOrDefault(false)
+
+        val currentSnap = state.value.vehicles.firstOrNull { it.id == vehicle.vehicle.id }?.snapshot ?: vehicle.vehicle.snapshot
+        val confirmedSnap = if (phase == OperationPhase.SUCCESS) {
+            when (action) {
+                DriveAction.APPROACH_ON -> currentSnap.copy(approachOn = true)
+                DriveAction.APPROACH_OFF -> currentSnap.copy(approachOn = false)
+                DriveAction.HAZARD_ON -> currentSnap.copy(hazardOn = true)
+                DriveAction.HAZARD_OFF -> currentSnap.copy(hazardOn = false)
+                DriveAction.POSITION_ON -> currentSnap.copy(positionOn = true)
+                DriveAction.POSITION_OFF -> currentSnap.copy(positionOn = false)
+                else -> currentSnap
+            }
+        } else currentSnap
+
+        if (phase == OperationPhase.SUCCESS && confirmedSnap !== currentSnap) {
+            val updatedOwned = vehicle.copy(vehicle = vehicle.vehicle.copy(snapshot = confirmedSnap))
+            owned = owned + (vehicle.vehicle.id to updatedOwned)
+            store?.saveSnapshot(vehicle.vehicle.id, com.google.gson.Gson().toJson(confirmedSnap))
+        }
+
+        change { it.copy(
+            vehicles = it.vehicles.map { v -> if (v.id == vehicle.vehicle.id) v.copy(snapshot = confirmedSnap) else v },
+            operation = operation.copy(phase = phase, message = message),
+            history = (listOf(entry) + it.history).take(100),
+            previousRequestUnresolved = unresolved
+        ) }
         if (phase == OperationPhase.SUCCESS) {
             scope.launch {
                 delay(2500)

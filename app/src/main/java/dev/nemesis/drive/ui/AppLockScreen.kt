@@ -35,11 +35,14 @@ fun AppLockScreen(
     onUnlockWithPin: (String) -> Boolean,
     onTriggerBiometric: () -> Unit,
     onMinimize: () -> Unit,
+    onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     BackHandler { onMinimize() }
 
     var enteredPin by remember { mutableStateOf("") }
+    var failedAttempts by remember { mutableStateOf(0) }
+    var showLogoutConfirmDialog by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) {
@@ -121,16 +124,32 @@ fun AppLockScreen(
 
                 // Error notice
                 AnimatedVisibility(
-                    visible = state.lockError != null,
+                    visible = state.lockError != null || failedAttempts >= 3,
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
-                    Text(
-                        text = state.lockError ?: "",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("pin_error_text")
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (state.lockError != null) {
+                            Text(
+                                text = state.lockError ?: "",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.testTag("pin_error_text")
+                            )
+                        }
+                        if (failedAttempts >= 3) {
+                            TextButton(
+                                onClick = { showLogoutConfirmDialog = true },
+                                modifier = Modifier.testTag("btn_forgot_pin_logout")
+                            ) {
+                                Text(
+                                    text = "Forgot PIN? Log Out & Reset",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -165,7 +184,10 @@ fun AppLockScreen(
                                             val success = onUnlockWithPin(newPin)
                                             if (!success) {
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                failedAttempts++
                                                 enteredPin = ""
+                                            } else {
+                                                failedAttempts = 0
                                             }
                                         }
                                     }
@@ -217,7 +239,10 @@ fun AppLockScreen(
                                     val success = onUnlockWithPin(newPin)
                                     if (!success) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        failedAttempts++
                                         enteredPin = ""
+                                    } else {
+                                        failedAttempts = 0
                                     }
                                 }
                             }
@@ -247,6 +272,30 @@ fun AppLockScreen(
                 }
             }
         }
+    }
+
+    if (showLogoutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirmDialog = false },
+            title = { Text("Log Out & Reset PIN?") },
+            text = { Text("To reset your PIN, you will be signed out. You can sign back in using your registered mobile number and OTP.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLogoutConfirmDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Log Out & Reset", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutConfirmDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
